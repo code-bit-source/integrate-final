@@ -5,18 +5,9 @@ export default async function handler(req, res) {
   res.setHeader("Access-Control-Allow-Methods", "GET,OPTIONS,PATCH,DELETE,POST,PUT");
   res.setHeader("Access-Control-Allow-Headers", "Content-Type, Authorization");
 
-  // ⭐ Preflight request
+  // ⭐ Preflight request (MUST be on top)
   if (req.method === "OPTIONS") {
     return res.status(200).end();
-  }
-
-  // ⭐ Test GET route
-  if (req.method === "GET") {
-    return res.status(200).json({
-      success: true,
-      message: "Backend API is running",
-      time: new Date().toISOString(),
-    });
   }
 
   // ⭐ Allow only POST
@@ -25,24 +16,35 @@ export default async function handler(req, res) {
   }
 
   // ⭐ BODY PARSING FIX (Vercel issue)
-  let bodyData = req.body;
-  if (typeof bodyData === "string") {
+  let body = req.body;
+
+  if (!body || body === "") {
+    return res.status(400).json({ error: "Empty Body" });
+  }
+
+  if (typeof body === "string") {
     try {
-      bodyData = JSON.parse(bodyData);
-    } catch {
-      return res.status(400).json({ error: "Invalid JSON Body" });
+      body = JSON.parse(body);
+    } catch (err) {
+      return res.status(400).json({ error: "Invalid JSON Format" });
     }
   }
 
-  const { amount } = bodyData;
+  const { amount } = body;
 
-  if (!amount) {
-    return res.status(400).json({ error: "Amount Missing" });
+  // ⭐ Validation Fix
+  if (!amount || isNaN(amount)) {
+    return res.status(400).json({ error: "Amount Missing or Invalid" });
   }
 
   try {
-    // ⭐ Correct Razorpay Import (Vercel Serverless Required)
+    // ⭐ Correct Razorpay Import for Vercel Serverless
     const Razorpay = (await import("razorpay")).default;
+
+    // ⭐ ENV CHECK (Important)
+    if (!process.env.RAZORPAY_KEY_ID || !process.env.RAZORPAY_SECRET) {
+      return res.status(500).json({ error: "Razorpay Keys Missing in Server" });
+    }
 
     const razorpay = new Razorpay({
       key_id: process.env.RAZORPAY_KEY_ID,
@@ -51,16 +53,19 @@ export default async function handler(req, res) {
 
     // ⭐ CREATE ORDER
     const order = await razorpay.orders.create({
-      amount: amount * 100, // convert Rs → paise
+      amount: Number(amount) * 100, // convert Rs → paise
       currency: "INR",
       receipt: "rcpt_" + Date.now(),
-      payment_capture: 1, // AUTO CAPTURE ON
     });
 
-    return res.status(200).json(order);
+    // ⭐ RETURN ORDER
+    return res.status(200).json({
+      success: true,
+      order,
+    });
 
   } catch (error) {
-    console.error("ORDER ERROR:", error); // log in vercel
+    console.error("ORDER ERROR:", error);
     return res.status(500).json({
       error: "Order Creation Failed",
       details: error.message,
