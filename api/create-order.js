@@ -1,17 +1,26 @@
 import Razorpay from "razorpay";
 
 export default async function handler(req, res) {
-  
-  // 🔵 1) GET Route (Test API)
+  // ⭐ CORS FIX
+  res.setHeader("Access-Control-Allow-Origin", "*");
+  res.setHeader("Access-Control-Allow-Methods", "POST, GET, OPTIONS");
+  res.setHeader("Access-Control-Allow-Headers", "Content-Type");
+
+  // ⭐ OPTIONS request (preflight)
+  if (req.method === "OPTIONS") {
+    return res.status(200).end();
+  }
+
+  // ⭐ GET — check API running
   if (req.method === "GET") {
     return res.status(200).json({
       success: true,
-      message: "Backend API is running successfully!",
+      message: "Backend API is running",
       time: new Date().toISOString(),
     });
   }
 
-  // 🔵 2) Allow only POST for order creation
+  // ⭐ Only POST allowed for Razorpay
   if (req.method !== "POST") {
     return res.status(405).json({ error: "Only POST allowed" });
   }
@@ -22,7 +31,7 @@ export default async function handler(req, res) {
     return res.status(400).json({ error: "Amount is required" });
   }
 
-  // Razorpay Instance (LIVE KEYS from Vercel ENV)
+  // ⭐ Razorpay instance
   const razorpay = new Razorpay({
     key_id: process.env.RAZORPAY_KEY_ID,
     key_secret: process.env.RAZORPAY_SECRET,
@@ -33,7 +42,7 @@ export default async function handler(req, res) {
       amount: amount * 100,
       currency: "INR",
       receipt: "receipt_" + Date.now(),
-      payment_capture: 1,  // ✔ Auto Capture ON
+      payment_capture: 1, // AUTO CAPTURE
     });
 
     return res.status(200).json(order);
