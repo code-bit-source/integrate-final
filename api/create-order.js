@@ -28,6 +28,15 @@ export default async function handler(req, res) {
 
   const action = body.action;
 
+  // ------------------------------------------------------
+  // 🔥 🔥 🔥 PASTE YOUR KEYS HERE (DIRECT, NO ENV)
+  // ------------------------------------------------------
+
+  const RAZORPAY_KEY_ID = "rzp_live_Rg4F7w8u2OfRcL";     // <-- paste here
+  const RAZORPAY_SECRET = "SkStsfqAxZdxpdoPd1FArAFF";   // <-- paste here
+
+  // ------------------------------------------------------
+
   // ------------------------------
   // 1️⃣ CREATE ORDER
   // ------------------------------
@@ -41,13 +50,9 @@ export default async function handler(req, res) {
     try {
       const Razorpay = (await import("razorpay")).default;
 
-      if (!process.env.RAZORPAY_KEY_ID || !process.env.RAZORPAY_SECRET) {
-        return res.status(500).json({ error: "Razorpay Keys Missing in Server" });
-      }
-
       const razorpay = new Razorpay({
-        key_id: process.env.RAZORPAY_KEY_ID,
-        key_secret: process.env.RAZORPAY_SECRET,
+        key_id: RAZORPAY_KEY_ID,  // using direct key
+        key_secret: RAZORPAY_SECRET,
       });
 
       const order = await razorpay.orders.create({
@@ -85,13 +90,8 @@ export default async function handler(req, res) {
       });
     }
 
-    const secret = process.env.RAZORPAY_SECRET;
-    if (!secret) {
-      return res.status(500).json({ error: "Secret key missing" });
-    }
-
     try {
-      const shasum = crypto.createHmac("sha256", secret);
+      const shasum = crypto.createHmac("sha256", RAZORPAY_SECRET);
       shasum.update(razorpay_order_id + "|" + razorpay_payment_id);
       const digest = shasum.digest("hex");
 
