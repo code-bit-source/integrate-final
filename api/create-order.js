@@ -5,7 +5,7 @@ export default async function handler(req, res) {
   res.setHeader("Access-Control-Allow-Methods", "GET,OPTIONS,PATCH,DELETE,POST,PUT");
   res.setHeader("Access-Control-Allow-Headers", "Content-Type, Authorization");
 
-  // ⭐ Preflight request (VERY IMPORTANT)
+  // ⭐ Preflight request
   if (req.method === "OPTIONS") {
     return res.status(200).end();
   }
@@ -19,19 +19,29 @@ export default async function handler(req, res) {
     });
   }
 
-  // ⭐ Allow only POST for Razorpay
+  // ⭐ Allow only POST
   if (req.method !== "POST") {
     return res.status(405).json({ error: "Only POST allowed" });
   }
 
-  const { amount } = req.body;
+  // ⭐ BODY PARSING FIX (Vercel issue)
+  let bodyData = req.body;
+  if (typeof bodyData === "string") {
+    try {
+      bodyData = JSON.parse(bodyData);
+    } catch {
+      return res.status(400).json({ error: "Invalid JSON Body" });
+    }
+  }
+
+  const { amount } = bodyData;
 
   if (!amount) {
     return res.status(400).json({ error: "Amount Missing" });
   }
 
   try {
-    // ⭐ Correct way to import Razorpay in Vercel Serverless
+    // ⭐ Correct Razorpay Import (Vercel Serverless Required)
     const Razorpay = (await import("razorpay")).default;
 
     const razorpay = new Razorpay({
@@ -39,19 +49,21 @@ export default async function handler(req, res) {
       key_secret: process.env.RAZORPAY_SECRET,
     });
 
+    // ⭐ CREATE ORDER
     const order = await razorpay.orders.create({
-      amount: amount * 100,
+      amount: amount * 100, // convert Rs → paise
       currency: "INR",
       receipt: "rcpt_" + Date.now(),
-      payment_capture: 1, // AUTO CAPTURE
+      payment_capture: 1, // AUTO CAPTURE ON
     });
 
     return res.status(200).json(order);
 
   } catch (error) {
+    console.error("ORDER ERROR:", error); // log in vercel
     return res.status(500).json({
       error: "Order Creation Failed",
-      details: error.message
+      details: error.message,
     });
   }
 }
